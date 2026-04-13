@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # ── Nginx Proxy Manager ─────────────────────────────────────
   npm:
@@ -117,7 +115,7 @@ services:
       - uxspecialty-net
 
 volumes:
-  mysql-data:
+  mysql-data-new:
     driver: local
   mysql-backups:
     driver: local
