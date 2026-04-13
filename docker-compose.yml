@@ -7,9 +7,9 @@ services:
     container_name: uxspecialty-npm
     restart: unless-stopped
     ports:
-      - "80:80"      # HTTP
-      - "443:443"    # HTTPS
-      - "81:81"      # NPM Admin UI
+      - "80:80" # HTTP
+      - "443:443" # HTTPS
+      - "81:81" # NPM Admin UI
     volumes:
       - npm-data:/data
       - npm-letsencrypt:/etc/letsencrypt
@@ -45,7 +45,7 @@ services:
     container_name: uxspecialty-api
     restart: unless-stopped
     ports:
-      - "9003:3000"
+      - "9003:9003"
     env_file:
       - .env-backend
     depends_on:
