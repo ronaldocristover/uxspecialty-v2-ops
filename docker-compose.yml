@@ -1,0 +1,122 @@
+version: "3.8"
+
+services:
+  # ── Nginx Proxy Manager ─────────────────────────────────────
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: uxspecialty-npm
+    restart: unless-stopped
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "81:81"      # NPM Admin UI
+    volumes:
+      - npm-data:/data
+      - npm-letsencrypt:/etc/letsencrypt
+    networks:
+      - uxspecialty-net
+
+  # ── MySQL Database ──────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: uxspecialty-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306"
+    networks:
+      - uxspecialty-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend API ─────────────────────────────────────────────
+  api:
+    image: registry.digitalocean.com/so-thai/uxspecialty-v2-api:latest
+    container_name: uxspecialty-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - uxspecialty-net
+
+  # ── Portal (Next.js) ────────────────────────────────────────
+  portal:
+    image: registry.digitalocean.com/so-thai/uxspecialty-v2-landing-next:latest
+    container_name: uxspecialty-portal
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.uxspecialty.com
+    networks:
+      - uxspecialty-net
+
+  # ── Admin Dashboard (Vue) ───────────────────────────────────
+  admin:
+    image: registry.digitalocean.com/so-thai/uxspecialty-v2-vue-dashboard:latest
+    container_name: uxspecialty-admin
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=https://api.uxspecialty.com
+    networks:
+      - uxspecialty-net
+
+  # ── Adminer (MySQL GUI) ───────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: uxspecialty-adminer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - uxspecialty-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ── MySQL Backup ───────────────────────────────────────────────
+  mysql-backup:
+    image: mysql:8.0
+    container_name: uxspecialty-mysql-backup
+    restart: unless-stopped
+    volumes:
+      - mysql-backups:/backups
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_HOST: mysql
+    entrypoint: []
+    command: >
+      sh -c "
+        mkdir -p /backups /var/log &&
+        (while true; do 
+          mysqldump --default-auth=mysql_native_password -h $${MYSQL_HOST} -u root -p\"$${MYSQL_ROOT_PASSWORD}\" $${MYSQL_DATABASE} > /backups/backup-$$(date +%Y%m%d-%H%M%S).sql 2>/dev/null
+          find /backups -name 'backup-*.sql' -mtime +7 -delete 2>/dev/null
+          sleep 86400
+        done) &
+        tail -f /dev/null
+      "
+    networks:
+      - uxspecialty-net
+
+volumes:
+  mysql-data:
+    driver: local
+  mysql-backups:
+    driver: local
+  npm-data:
+  npm-letsencrypt:
+
+networks:
+  uxspecialty-net:
+    driver: bridge
