@@ -47,7 +47,7 @@ services:
     ports:
       - "9003:3000"
     env_file:
-      - .env
+      - .env-backend
     depends_on:
       mysql:
         condition: service_healthy
