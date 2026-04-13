@@ -44,6 +44,8 @@ services:
     image: registry.digitalocean.com/so-thai/uxspecialty-v2-api:latest
     container_name: uxspecialty-api
     restart: unless-stopped
+    ports:
+      - "9003:3000"
     env_file:
       - .env
     depends_on:
