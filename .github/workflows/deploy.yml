@@ -1,0 +1,46 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy config files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "docker-compose.yml,.env,scripts/deploy.sh"
+          target: /opt/uxspecialty-v2-ops
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/uxspecialty-v2-ops
+
+            # Login to DigitalOcean registry
+            echo "${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" | \
+              docker login registry.digitalocean.com \
+                -u "${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" \
+                --password-stdin
+
+            # Pull latest images and deploy
+            docker compose pull api portal admin
+            docker compose up -d --remove-orphans
+
+            # Cleanup unused images
+            docker image prune -f
+
+            echo "Deploy completed at $(date)"
